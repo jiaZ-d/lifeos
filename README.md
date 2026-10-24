@@ -79,11 +79,11 @@ $env:PYTHONPATH = "$PWD"
 
 ## 配置(根目录 `config/`)
 
-| 文件 | 说明 | 是否入库 |
-|---|---|---|
-| `config/server.json` | 服务监听地址与端口(`host` / `port`),`python -m app.main` 与启动脚本均读取此文件 | ✅ 入库 |
-| `config/llm_config.json` | LLM 运行时配置:`base_url` / `model` / `api_key`(**含真实 Key,不入库**) | ❌ 已 gitignore |
-| `config/llm_config.example.json` | 上述文件的模板,Key 以 `xxx` 占位 | ✅ 入库 |
+| 文件 | 说明 |
+|---|---|
+| `config/server.json` | 服务监听地址与端口(`host` / `port`),`python -m app.main` 与启动脚本均读取此文件 |
+| `config/llm_config.json` | LLM 运行时配置:`base_url` / `model` / `api_key` |
+| `config/llm_config.example.json` | 上述文件的模板,Key 以 `xxx` 占位 |
 
 **模型 Key 配置步骤**:
 
