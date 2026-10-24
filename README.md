@@ -107,4 +107,4 @@ $env:PYTHONPATH = "$PWD"
 
 ## License
 
-个人项目,仅供学习与自用。
+本项目基于 [Apache License 2.0](LICENSE) 开源。
