@@ -5,6 +5,7 @@ import { api, getToken } from './api.js'
 const NAV = [
   ['/', '✅ 今日'],
   ['/records', '📝 记录'],
+  ['/knowledge', '📚 知识库'],
   ['/timeline', '🕐 时间轴'],
   ['/goals', '🎯 目标'],
   ['/board', '📋 看板'],

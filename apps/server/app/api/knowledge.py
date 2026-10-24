@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid as _uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import get_current_user
 from ..config import settings
+from ..db import get_db
 from ..models import KnowledgeDomain, KnowledgeFolder, KnowledgeNote, User
 from .tasks import _owned  # reuse ownership helper (task-agnostic by model)
 
@@ -98,18 +99,19 @@ async def create_domain(
 async def delete_domain(
     domain_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
-    """Delete domain with all folders & notes (cascade)."""
+    """Delete domain with all folders & notes (children first — raw FK has no
+    ORM relationship, so unit-of-work ordering cannot be trusted here)."""
     d = await _owned(db, KnowledgeDomain, domain_id, user)
-    folders = (
-        await db.execute(select(KnowledgeFolder).where(KnowledgeFolder.domain_id == domain_id))
-    ).scalars().all()
-    for f in folders:
-        notes = (
-            await db.execute(select(KnowledgeNote).where(KnowledgeNote.folder_id == f.id))
-        ).scalars().all()
-        for n in notes:
-            await db.delete(n)
-        await db.delete(f)
+    from sqlalchemy import delete as sa_delete
+
+    await db.execute(
+        sa_delete(KnowledgeNote).where(
+            KnowledgeNote.folder_id.in_(
+                select(KnowledgeFolder.id).where(KnowledgeFolder.domain_id == domain_id)
+            )
+        )
+    )
+    await db.execute(sa_delete(KnowledgeFolder).where(KnowledgeFolder.domain_id == domain_id))
     await db.delete(d)
     await db.commit()
     return {"ok": True}
@@ -137,11 +139,9 @@ async def delete_folder(
     folder_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     f = await _owned(db, KnowledgeFolder, folder_id, user)
-    notes = (
-        await db.execute(select(KnowledgeNote).where(KnowledgeNote.folder_id == folder_id))
-    ).scalars().all()
-    for n in notes:
-        await db.delete(n)
+    from sqlalchemy import delete as sa_delete
+
+    await db.execute(sa_delete(KnowledgeNote).where(KnowledgeNote.folder_id == folder_id))
     await db.delete(f)
     await db.commit()
     return {"ok": True}
