@@ -142,3 +142,13 @@ if DIST_DIR.exists():
         if full_path and target.is_file():
             return FileResponse(target)
         return FileResponse(DIST_DIR / "index.html")
+
+
+if __name__ == "__main__":
+    # python -m app.main — host/port come from config/server.json
+    import uvicorn
+
+    from .config import load_server_config
+
+    _srv = load_server_config()
+    uvicorn.run(app, host=_srv.get("host", "127.0.0.1"), port=int(_srv.get("port", 8000)))

@@ -291,7 +291,7 @@ async def reveal_key(admin: User = Depends(get_admin_user)):
 
 @router.put("/config")
 async def set_config(body: LLMConfigIn, admin: User = Depends(get_admin_user)):
-    """Admin only: persist LLM endpoint/model/key to data/llm_config.json."""
+    """Admin only: persist LLM endpoint/model/key to config/llm_config.json."""
     from ..config import load_llm_config, save_llm_config
     from ..services import llm as llm_svc
 

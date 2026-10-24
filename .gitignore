@@ -30,3 +30,6 @@ tb.txt
 docs/产品文档.md
 docs/测试报告.md
 pytest-of-*/
+
+# 真实 LLM 配置(含 api_key),仓库只保留 llm_config.example.json 模板
+config/llm_config.json

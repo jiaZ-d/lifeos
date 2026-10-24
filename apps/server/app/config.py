@@ -1,11 +1,13 @@
 """Application configuration (env-driven)."""
 import json
+import shutil
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # apps/server
 DATA_DIR = BASE_DIR.parent / "data"  # lifeos/data
+CONFIG_DIR = BASE_DIR.parent / "config"  # lifeos/config (llm_config.json / server.json)
 
 
 class Settings(BaseSettings):
@@ -48,8 +50,23 @@ def _load_or_create_jwt_secret() -> str:
 
 settings.jwt_secret = _load_or_create_jwt_secret()
 
-# ---- LLM runtime overrides persisted to data/llm_config.json (base_url/model/api_key) ----
-LLM_CONFIG_PATH = DATA_DIR / "llm_config.json"
+# ---- server runtime config (host/port) persisted to config/server.json ----
+SERVER_CONFIG_PATH = CONFIG_DIR / "server.json"
+SERVER_CONFIG_DEFAULTS = {"host": "127.0.0.1", "port": 8000}
+
+
+def load_server_config() -> dict:
+    cfg = dict(SERVER_CONFIG_DEFAULTS)
+    if SERVER_CONFIG_PATH.exists():
+        try:
+            cfg.update(json.loads(SERVER_CONFIG_PATH.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    return cfg
+
+
+# ---- LLM runtime overrides persisted to config/llm_config.json (base_url/model/api_key) ----
+LLM_CONFIG_PATH = CONFIG_DIR / "llm_config.json"
 
 
 def load_llm_config() -> dict:
@@ -62,6 +79,14 @@ def load_llm_config() -> dict:
 
 
 def save_llm_config(cfg: dict) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     LLM_CONFIG_PATH.write_text(
         json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+
+
+# one-time migration: data/llm_config.json -> config/llm_config.json
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+_legacy_llm_config = DATA_DIR / "llm_config.json"
+if _legacy_llm_config.exists() and not LLM_CONFIG_PATH.exists():
+    shutil.move(str(_legacy_llm_config), str(LLM_CONFIG_PATH))
