@@ -40,7 +40,11 @@ lifeos/
 │   │   ├── migrations/  # Alembic 数据库迁移
 │   │   └── scripts/     # 调试 / 维护脚本
 │   └── web/             # React (Vite) 前端
-└── data/                # 运行时数据(不入库):SQLite · JWT 密钥 · LLM 配置 · 备份
+├── config/              # 配置:server.json(端口) · llm_config.json(不入库) · example 模板
+├── data/                # 运行时数据(不入库):SQLite · JWT 密钥 · 附件 · 备份
+├── *.bat                # 启动 / 重启 / 停止脚本(读取 config/server.json)
+├── README.md
+└── LICENSE              # Apache-2.0
 ```
 
 ## 快速开始
