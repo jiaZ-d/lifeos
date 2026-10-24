@@ -1,0 +1,27 @@
+# 运行时数据与密钥(含真实用户数据/JWT 密钥/LLM API Key,严禁入库)
+data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.pytest-tmp/
+pytest-cache-files-*/
+.tmp-run/
+.tmp-build/
+
+# Node / 前端构建产物(可由 npx vite build 重建)
+node_modules/
+dist/
+
+# 调试残留
+debug_out.txt
+tb.txt
+
+# 备份与临时数据库
+*.db
+*.db-shm
+*.db-wal
+*.log
+.env

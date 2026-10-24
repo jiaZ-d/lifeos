@@ -1,0 +1,34 @@
+[project]
+name = "lifeos-server"
+version = "1.0.0"
+description = "LifeOS - personal life & goal management system backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "alembic>=1.13",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "argon2-cffi>=23.1",
+    "cryptography>=42.0",
+    "openai>=1.40",
+    "pyjwt>=2.8",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "asgi-lifespan>=2.0"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["app/tests"]
+addopts = "-m 'not llm_real'"
+markers = [
+    "llm_real: calls the real Zhipu GLM API (run explicitly with -m llm_real; consumes quota)",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

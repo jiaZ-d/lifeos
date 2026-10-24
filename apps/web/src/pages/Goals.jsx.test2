@@ -1,0 +1,177 @@
+﻿import React, { useEffect, useState } from 'react'
+import { api } from '../api.js'
+
+export const DIMENSION_CN = { growth: '鎴愰暱', career: '鑱屼笟', health: '鍋ュ悍', finance: '璐㈠姟', relationship: '鍏崇郴' }
+
+const Chevron = ({ open }) => (
+  <span style={{ display: 'inline-block', width: 14, color: 'var(--muted)' }}>{open ? '鈻? : '鈻?}</span>
+)
+
+const GRAIN = { year: '骞?, month: '鏈?, week: '鍛? }
+
+export default function Goals() {
+  const [goals, setGoals] = useState([])
+  const [tasks, setTasks] = useState([])
+  const [goalForm, setGoalForm] = useState({ title: '', description: '', dimension: 'growth', deadline: '' })
+  const [taskForms, setTaskForms] = useState({})
+  const [msg, setMsg] = useState('')
+  const [genMsg, setGenMsg] = useState({})
+  const [busy, setBusy] = useState(null)
+  const [open, setOpen] = useState({}) // 榛樿鍏ㄩ儴鏀惰捣
+  const toggle = (k) => setOpen((o) => ({ ...o, [k]: !o[k] }))
+  const isOpen = (k) => !!open[k]
+  const Chevron = ({ k, label }) => (
+    <span className="muted" style={{ cursor: 'pointer' }} onClick={() => toggle(k)}>
+      {collapsed[k] ? '鈻?' : '鈻?'}{label}
+    </span>
+  )
+
+  const load = async () => {
+    setGoals(await api.get('/api/goals'))
+    setTasks(await api.get('/api/tasks'))
+  }
+  useEffect(() => { load().catch((e) => setMsg(e.message)) }, [])
+
+  const addGoal = async (e) => {
+    e.preventDefault()
+    await api.post('/api/goals', { ...goalForm, deadline: goalForm.deadline || null })
+    setGoalForm({ title: '', description: '', dimension: 'growth', deadline: '' })
+    await load()
+  }
+
+  const addTask = async (goalId, parentId, granularity) => {
+    const key = `${parentId || goalId}-${granularity}`
+    const title = taskForms[key]
+    if (!title) return
+    await api.post('/api/tasks', { goal_id: goalId, parent_task_id: parentId || null, granularity, title })
+    setTaskForms({ ...taskForms, [key]: '' })
+    await load()
+  }
+
+  const genYearTasks = async (goalId) => {
+    setGenMsg({ ...genMsg, [goalId]: 'AI 鐢熸垚瀛愮洰鏍囦腑鈥? })
+    try {
+      const r = await api.post('/api/llm/generate-tasks', { goal_id: goalId, granularity: 'year' })
+      for (const t of r.tasks) {
+        await api.post('/api/tasks', {
+          goal_id: goalId, granularity: 'year', title: t.title,
+          priority: t.priority || 2, estimate_hours: t.estimate_hours || null,
+        })
+      }
+      setGenMsg({ ...genMsg, [goalId]: r.degraded ? '鈿狅笍 AI 涓嶅彲鐢?宸茬敤妯℃澘鐢熸垚瀛愮洰鏍? : '鉁?瀛愮洰鏍囧凡鐢熸垚,涓嬩竴姝?鎷嗚В涓烘湀搴﹁繘搴﹁鍒? })
+      await load()
+    } catch (ex) {
+      setGenMsg({ ...genMsg, [goalId]: ex.message })
+    }
+  }
+
+  const decompose = async (t) => {
+    setBusy(t.id)
+    setMsg('鎷嗚В涓€?)
+    try {
+      const r = await api.post(`/api/tasks/${t.id}/decompose`)
+      const label = t.granularity === 'year' ? '鏈堝害杩涘害瑙勫垝' : '鍛ㄤ换鍔?
+      setMsg(r.degraded
+        ? `鈿狅笍 AI 涓嶅彲鐢?宸叉寜妯℃澘鐢熸垚 ${r.children.length} 鏉?{label}`
+        : `鉁?宸茬敓鎴?${r.children.length} 鏉?{label}`)
+      await load()
+    } catch (ex) {
+      setMsg(ex.message)
+    }
+    setBusy(null)
+  }
+
+  const setStatus = async (taskId, status) => {
+    await api.put(`/api/tasks/${taskId}`, { status })
+    await load()
+  }
+
+  const delTask = async (taskId) => {
+    if (!confirm('鍒犻櫎璇ヤ换鍔?鍚叾瀛愪换鍔??')) return
+    await api.del(`/api/tasks/${taskId}`)
+    await load()
+  }
+
+  const childrenOf = (parentId) =>
+    tasks
+      .filter((t) => t.parent_task_id === parentId)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.due_date || '').localeCompare(b.due_date || ''))
+  const yearTasksOf = (goalId) => tasks.filter((t) => t.goal_id === goalId && t.granularity === 'year' && !t.parent_task_id)
+
+  const TaskRow = ({ t, indent = 0, canDecomposeTo, decomposeLabel, statusLabels }) => {
+    const labels = statusLabels || { backlog: '寰呭姙', doing: '杩涜涓?, done: '瀹屾垚' }
+    return (
+    <div className="list-item" style={{ marginLeft: indent }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="row">
+          <span className={`badge ${t.status === 'done' ? 'green' : t.status === 'doing' ? '' : 'gray'}`}>
+            {labels[t.status]}
+          </span>
+          <span>{t.title}</span>
+          <span className="muted">瀹屾垚搴?{(t.progress * 100).toFixed(0)}%</span>
+        </div>
+        <div className="progress" style={{ margin: '6px 0', maxWidth: 420 }}><div style={{ width: `${t.progress * 100}%` }} /></div>
+      </div>
+      <div className="row">
+        {t.status !== 'done' && (
+          <button className="ghost" onClick={() => setStatus(t.id, t.status === 'backlog' ? 'doing' : 'done')}>
+            {t.status === 'backlog' ? '寮€濮? : '瀹屾垚'}
+          </button>
+        )}
+        {canDecomposeTo && (
+          <button className="ghost" disabled={busy === t.id}
+            onClick={() => decompose(t)}>
+            {busy === t.id ? `鈴?鐢熸垚${decomposeLabel}鈥 : `鎷嗚В涓?{decomposeLabel}`}
+          </button>
+        )}
+        <button className="danger" onClick={() => delTask(t.id)}>鍒?/button>
+      </div>
+    </div>
+  )
+  }
+  return (
+    <div>
+      <h2 className="page-title">馃幆 鐩爣</h2>
+
+      <div className="card">
+        <b>鎿嶄綔娴佺▼</b>
+        <p className="muted" style={{ margin: '6px 0 0' }}>
+          鈶?鍒涘缓鐩爣 鈫?鈶?AI 鐢熸垚瀛愮洰鏍?鈫?鈶?瀛愮洰鏍?<b>鎷嗚В涓烘湀搴﹁繘搴﹁鍒?/b>(鎸夋湀鍒楀嚭闃舵鎴愭灉涓庣疮璁¤繘搴?鈫?鈶?姣忔湀瑙勫垝 <b>鎷嗚В涓哄懆浠诲姟</b> 鈫?鈶?鍛ㄤ换鍔″湪鐪嬫澘"AI 鎷嗚В寰呭姙"鐢熸垚姣忔棩寰呭姙
+        </p>
+      </div>
+
+      <form className="card row" onSubmit={addGoal}>
+        <input placeholder="鏂扮洰鏍?濡?閫氳繃 PMP 璁よ瘉" value={goalForm.title} required style={{ flex: 1, minWidth: 180 }}
+          onChange={(e) => setGoalForm({ ...goalForm, title: e.target.value })} />
+        <select value={goalForm.dimension} onChange={(e) => setGoalForm({ ...goalForm, dimension: e.target.value })}>
+          {['growth', 'career', 'health', 'finance', 'relationship'].map((d) => <option key={d} value={d}>{DIMENSION_CN[d]}</option>)}
+        </select>
+        <input type="date" value={goalForm.deadline} onChange={(e) => setGoalForm({ ...goalForm, deadline: e.target.value })} />
+        <button>娣诲姞鐩爣</button>
+      </form>
+      {msg && <p className="muted">{msg}</p>}
+
+      {goals.map((g) => {
+        const gKey = `g-${g.id}`
+        const years = yearTasksOf(g.id)
+        return (
+        <div className="card" key={g.id}>
+          <div className="spread">
+            <div style={{ cursor: 'pointer' }} onClick={() => toggle(gKey)}>
+              <Chevron open={isOpen(gKey)} />
+              <b style={{ fontSize: 15 }}>馃幆 {g.title}</b>{' '}
+              <span className="badge">{DIMENSION_CN[g.dimension] || g.dimension}</span>{' '}
+              <span className="badge green">杩涘害 {(g.progress * 100).toFixed(0)}%</span>{' '}
+              <span className="muted">{years.length} 涓瓙鐩爣</span>
+              {g.deadline && <span className="muted"> 鎴 {g.deadline}</span>}
+            </div>
+            <div className="row">
+              <button className="ghost" onClick={(e) => { e.stopPropagation(); genYearTasks(g.id) }}>鈶?AI 鐢熸垚瀛愮洰鏍?/button>
+              <button className="danger" onClick={async (e) => { e.stopPropagation(); await api.del(`/api/goals/${g.id}`); await load() }}>鍒?/button>
+            </div>
+          </div>
+          {genMsg[g.id] && <p className="muted">{genMsg[g.id]}</p>}
+          <div className="progress" style={{ margin: '8px 0 14px' }}><div style={{ width: `${g.progress * 100}%` }} /></div>
+
+          {isOpen(gKey) && (<>
+          {/* step 2: goals -> 瀛愮洰鏍?-> 鏈堝害杩涘害瑙勫垝 */}
