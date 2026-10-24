@@ -88,11 +88,9 @@ $env:PYTHONPATH = "$PWD"
 **模型 Key 配置步骤**:
 
 1. 复制模板:`copy config\llm_config.example.json config\llm_config.json`(也可以直接在应用「⚙️ 设置 → 🤖 LLM 配置」页填写,仅管理员,保存即写入该文件);
-2. 把 `api_key` 的 `xxx` 替换为真实 Key——默认端点是[智谱开放平台](https://open.bigmodel.cn/) `https://open.bigmodel.cn/api/paas/v4`,Key 在其控制台创建;模型名必须是平台上架的(如 `glm-5.3-flash`,已下线的 `glm-4-flash` 会报 1314 错误);
+2. 把 `api_key` 的 `xxx` 替换为真实 Key——默认端点是[智谱开放平台](https://open.bigmodel.cn/) `https://open.bigmodel.cn/api/paas/v4`,Key 在其控制台创建;模型名必须是平台上架的(如 `glm-5.3-flash`);
 3. `base_url` 兼容任意 OpenAI 风格端点,可自行切换其他服务商;
 4. 不配置 Key 也能用:所有 AI 功能自动降级为内置模板输出,其余功能不受影响。
-
-> 从旧版本升级时,`data/llm_config.json` 会在启动时自动迁移到 `config/llm_config.json`,无需手动搬。
 
 ## 定时任务
 
