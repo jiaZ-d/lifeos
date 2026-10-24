@@ -25,3 +25,7 @@ tb.txt
 *.db-wal
 *.log
 .env
+
+# 本地专用文档,不上传仓库
+docs/产品文档.md
+docs/测试报告.md
