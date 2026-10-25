@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { api, getToken } from './api.js'
+import { api, getToken, setToken } from './api.js'
 
 const NAV = [
   ['/', '✅ 今日'],
@@ -22,7 +22,7 @@ export default function App() {
     api.get('/api/auth/me').then((me) => setIsAdmin(me.is_admin)).catch(() => {})
   }, [])
   const logout = () => {
-    localStorage.removeItem('lifeos_token')
+    setToken('')
     nav('/login')
   }
   const navItems = isAdmin ? [...NAV, ['/users', '👑 用户管理']] : NAV

@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime as dt
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,23 @@ async def get_current_user(
     if creds is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     user_id = decode_token(creds.credentials)
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+    return user
+
+
+async def get_current_user_or_cookie(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    lifeos_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Bearer 头优先,其次 lifeos_token Cookie——供 <img> 等无法携带
+    Authorization 头的资源加载使用(前端登录时同步写该 Cookie)。"""
+    token = creds.credentials if creds is not None else lifeos_token
+    if not token:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
+    user_id = decode_token(token)
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")

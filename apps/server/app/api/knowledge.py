@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_or_cookie
 from ..config import settings
 from ..db import get_db
 from ..models import KnowledgeDomain, KnowledgeFolder, KnowledgeNote, User
@@ -224,8 +224,9 @@ async def upload_image(
 
 
 @router.get("/images/{user_id}/{name}")
-async def get_image(user_id: int, name: str, user: User = Depends(get_current_user)):
-    """Serve a knowledge image (owner-only)."""
+async def get_image(user_id: int, name: str, user: User = Depends(get_current_user_or_cookie)):
+    """Serve a knowledge image (owner-only). 支持 Cookie 鉴权:Markdown 预览中
+    的 <img> 无法携带 Authorization 头,靠登录时写入的 lifeos_token Cookie 访问。"""
     if user_id != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问他人图片")
     path = KNOWLEDGE_DIR / str(user_id) / name

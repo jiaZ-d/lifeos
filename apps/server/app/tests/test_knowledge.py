@@ -131,3 +131,17 @@ async def test_knowledge_image_upload_and_access(client):
         "/api/knowledge/upload-image", headers=h1, files={"file": ("evil.exe", b"MZ", "application/x-msdownload")}
     )
     assert bad.status_code == 400
+
+    # Cookie 兜底鉴权(Markdown 预览中的 <img> 无法携带 Authorization 头)
+    r3 = await client.post("/api/auth/register", json={"username": "kbimg3", "password": "pass123456"})
+    tok3 = r3.json()["token"]
+    up3 = await client.post(
+        "/api/knowledge/upload-image",
+        headers={"Authorization": f"Bearer {tok3}"},
+        files={"file": ("c.png", png, "image/png")},
+    )
+    url3 = up3.json()["url"]
+    own = await client.get(url3, cookies={"lifeos_token": tok3})
+    assert own.status_code == 200 and own.content == png  # 本人 cookie 可取
+    assert (await client.get(url, cookies={"lifeos_token": tok3})).status_code == 403  # 他人图片仍拒绝
+    assert (await client.get(url3)).status_code == 401  # 无任何凭据
