@@ -12,6 +12,7 @@ export default function Knowledge() {
   const [openF, setOpenF] = useState({})      // folder expansion
   const [note, setNote] = useState(null)      // currently open note {id,folder_id,title,content_md}
   const [editing, setEditing] = useState(false)
+  const [newFolderId, setNewFolderId] = useState(null) // 新建模式:目标笔记本 id(null=非新建)
   const [draft, setDraft] = useState({ title: '', content_md: '' })
   const [msg, setMsg] = useState('')
   const [mode, setMode] = useState('edit')    // edit | preview | split
@@ -39,6 +40,7 @@ export default function Knowledge() {
 
   const openNote = async (id) => {
     const n = await api.get(`/api/knowledge/notes/${id}`)
+    setNewFolderId(null)
     setNote(n)
     setDraft({ title: n.title, content_md: n.content_md })
     setEditing(false)
@@ -47,13 +49,26 @@ export default function Knowledge() {
 
   const saveNote = async () => {
     if (!draft.title.trim()) return setMsg('标题不能为空')
-    await api.put(`/api/knowledge/notes/${note.id}`, {
-      title: draft.title, content_md: draft.content_md,
-    })
-    setEditing(false)
-    setNote({ ...note, title: draft.title, content_md: draft.content_md })
-    await load()
-    setMsg('✅ 已保存')
+    try {
+      if (newFolderId != null) {
+        // 新建:直接在右侧编辑后保存创建
+        const r = await api.post('/api/knowledge/notes', {
+          folder_id: newFolderId, title: draft.title, content_md: draft.content_md,
+        })
+        setNewFolderId(null)
+        await load()
+        await openNote(r.id)
+        setMsg('✅ 已创建')
+      } else {
+        await api.put(`/api/knowledge/notes/${note.id}`, {
+          title: draft.title, content_md: draft.content_md,
+        })
+        setEditing(false)
+        setNote({ ...note, title: draft.title, content_md: draft.content_md })
+        await load()
+        setMsg('✅ 已保存')
+      }
+    } catch (ex) { setMsg(ex.message) }
   }
 
   const addDomain = () =>
@@ -66,12 +81,15 @@ export default function Knowledge() {
       await api.post(`/api/knowledge/domains/${domainId}/folders`, { name }); await load()
     }, '笔记本名称')
 
-  const addNote = (folderId) =>
-    askInput('新建笔记', async (title) => {
-      const r = await api.post('/api/knowledge/notes', { folder_id: folderId, title, content_md: '# ' + title + '\n\n' })
-      await load()
-      await openNote(r.id)
-    }, '笔记标题')
+  const addNote = (folderId) => {
+    // 不弹窗:右侧直接进入新建编辑态
+    setNewFolderId(folderId)
+    setNote(null)
+    setDraft({ title: '', content_md: '' })
+    setEditing(true)
+    setMode('edit')
+    setMsg('')
+  }
 
   const del = (kind, id, label) =>
     askConfirm(`确认删除${label}?(级联删除其下所有内容,不可恢复)`, async () => {
@@ -174,14 +192,14 @@ export default function Knowledge() {
 
         {/* right: note editor / preview */}
         <div className="kb-main">
-          {!note && (
+          {!note && newFolderId == null && (
             <div className="card"><p className="muted">← 在左侧选择或创建一篇笔记</p></div>
           )}
-          {note && (
+          {(note || newFolderId != null) && (
             <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <div className="spread" style={{ marginBottom: 8 }}>
                 {editing ? (
-                  <input value={draft.title} style={{ flex: 1, fontWeight: 600 }}
+                  <input value={draft.title} placeholder="笔记标题" style={{ flex: 1, fontWeight: 600 }}
                     onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
                 ) : (
                   <b style={{ fontSize: 16 }}>{note.title}</b>
@@ -198,7 +216,13 @@ export default function Knowledge() {
                         <option value="preview">预览</option>
                       </select>
                       <button onClick={saveNote}>保存</button>
-                      <button className="ghost" onClick={() => { setEditing(false); setDraft({ title: note.title, content_md: note.content_md }) }}>取消</button>
+                      <button className="ghost" onClick={() => {
+                        if (newFolderId != null) {
+                          setNewFolderId(null); setEditing(false); setDraft({ title: '', content_md: '' })
+                        } else {
+                          setEditing(false); setDraft({ title: note.title, content_md: note.content_md })
+                        }
+                      }}>取消</button>
                     </>
                   ) : (
                     <>
