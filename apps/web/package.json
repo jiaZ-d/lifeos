@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@uiw/react-md-editor": "^4.1.3",
     "echarts": "^5.5.0",
     "marked": "^18.1.1",
     "react": "^18.3.1",

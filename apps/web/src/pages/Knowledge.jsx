@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
+import MDEditor from '@uiw/react-md-editor'
+import '@uiw/react-md-editor/markdown-editor.css'
 import { api } from '../api.js'
 
 const Chevron = ({ open }) => (
@@ -15,10 +17,10 @@ export default function Knowledge() {
   const [newFolderId, setNewFolderId] = useState(null) // 新建模式:目标笔记本 id(null=非新建)
   const [draft, setDraft] = useState({ title: '', content_md: '' })
   const [msg, setMsg] = useState('')
-  const [mode, setMode] = useState('edit')    // edit | preview | split
+  const [mode, setMode] = useState('edit')    // edit | split | preview
   const [modal, setModal] = useState(null)    // 页内弹窗: {kind:'input'|'confirm', ...}
   const [modalValue, setModalValue] = useState('')
-  const taRef = useRef(null)
+  const editorRef = useRef(null)              // MDEditor 容器(图片插入定位其内 textarea)
 
   const askInput = (title, onOk, placeholder = '') => {
     setModalValue('')
@@ -109,7 +111,7 @@ export default function Knowledge() {
       fd.append('file', file)
       const r = await api.postForm('/api/knowledge/upload-image', fd)
       const md = `![${file.name}](${r.url})`
-      const ta = taRef.current
+      const ta = editorRef.current?.querySelector('textarea')
       if (ta) {
         const s = ta.selectionStart, epos = ta.selectionEnd
         const text = draft.content_md
@@ -124,16 +126,6 @@ export default function Knowledge() {
   const preview = (md) => {
     return { __html: marked.parse(md || '', { breaks: true }) }
   }
-
-  const Editor = () => (
-    <textarea
-      ref={taRef}
-      className="kb-editor"
-      value={draft.content_md}
-      onChange={(e) => setDraft({ ...draft, content_md: e.target.value })}
-    />
-  )
-  const Preview = () => <div className="kb-preview md" dangerouslySetInnerHTML={preview(draft.content_md)} />
 
   return (
     <div>
@@ -233,9 +225,14 @@ export default function Knowledge() {
                 </div>
               </div>
               {editing ? (
-                <div style={{ flex: 1, display: 'flex', gap: 10, minHeight: 400 }}>
-                  {mode !== 'preview' && <Editor />}
-                  {mode !== 'edit' && <div style={{ flex: 1, overflow: 'auto' }}><Preview /></div>}
+                <div ref={editorRef} data-color-mode="light" style={{ flex: 1, minHeight: 420, display: 'flex' }}>
+                  <MDEditor
+                    value={draft.content_md}
+                    onChange={(v) => setDraft({ ...draft, content_md: v || '' })}
+                    preview={mode === 'split' ? 'live' : mode}
+                    height="100%"
+                    style={{ flex: 1, background: '#fff' }}
+                  />
                 </div>
               ) : (
                 <div className="md" style={{ overflow: 'auto' }} dangerouslySetInnerHTML={preview(note.content_md)} />
