@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
-import MDEditor from '@uiw/react-md-editor'
-import '@uiw/react-md-editor/markdown-editor.css'
+import Vditor from 'vditor'
+import 'vditor/dist/index.css'
 import { api } from '../api.js'
 
 const Chevron = ({ open }) => (
@@ -20,7 +20,10 @@ export default function Knowledge() {
   const [mode, setMode] = useState('edit')    // edit | split | preview
   const [modal, setModal] = useState(null)    // 页内弹窗: {kind:'input'|'confirm', ...}
   const [modalValue, setModalValue] = useState('')
-  const editorRef = useRef(null)              // MDEditor 容器(图片插入定位其内 textarea)
+  const editorRef = useRef(null)              // vditor 容器
+  const vdInst = useRef(null)                 // vditor 实例
+  const draftRef = useRef(draft)
+  draftRef.current = draft
 
   const askInput = (title, onOk, placeholder = '') => {
     setModalValue('')
@@ -51,11 +54,13 @@ export default function Knowledge() {
 
   const saveNote = async () => {
     if (!draft.title.trim()) return setMsg('标题不能为空')
+    // 编辑态以 vditor 实例当前值为准(避免初始化窗口期 React 状态滞后丢字)
+    const contentMd = vdInst.current?.getValue?.() ?? draft.content_md
     try {
       if (newFolderId != null) {
         // 新建:直接在右侧编辑后保存创建
         const r = await api.post('/api/knowledge/notes', {
-          folder_id: newFolderId, title: draft.title, content_md: draft.content_md,
+          folder_id: newFolderId, title: draft.title, content_md: contentMd,
         })
         setNewFolderId(null)
         await load()
@@ -63,10 +68,10 @@ export default function Knowledge() {
         setMsg('✅ 已创建')
       } else {
         await api.put(`/api/knowledge/notes/${note.id}`, {
-          title: draft.title, content_md: draft.content_md,
+          title: draft.title, content_md: contentMd,
         })
         setEditing(false)
-        setNote({ ...note, title: draft.title, content_md: draft.content_md })
+        setNote({ ...note, title: draft.title, content_md: contentMd })
         await load()
         setMsg('✅ 已保存')
       }
@@ -100,10 +105,10 @@ export default function Knowledge() {
       await load()
     })
 
-  // 图片上传:上传后把 Markdown 语法插入光标处(支持多张一次插入)
-  const uploadAndInsertImages = async (files) => {
-    const imgs = files.filter((f) => f.type.startsWith('image/'))
-    if (!imgs.length) return
+  // 图片上传:vditor 工具栏 / 粘贴 / 拖拽统一入口,上传后返回 Markdown 文本
+  const uploadImagesToMarkdown = async (files) => {
+    const imgs = (files || []).filter((f) => f.type.startsWith('image/'))
+    if (!imgs.length) return null
     setMsg('图片上传中…')
     const parts = []
     for (const f of imgs) {
@@ -114,29 +119,38 @@ export default function Knowledge() {
       try {
         const r = await api.postForm('/api/knowledge/upload-image', fd)
         parts.push(`![${r.url.split('/').pop()}](${r.url})`)
-      } catch (ex) { setMsg(ex.message); return }
+      } catch (ex) { setMsg(ex.message); return null }
     }
-    const ta = editorRef.current?.querySelector('textarea')
-    const s = ta ? ta.selectionStart : (draft.content_md || '').length
-    const epos = ta ? ta.selectionEnd : s
-    const text = draft.content_md || ''
-    setDraft({ ...draft, content_md: text.slice(0, s) + parts.join('\n') + '\n' + text.slice(epos) })
-    setMsg(`✅ 已插入 ${parts.length} 张图片(保存后生效)`)
+    setMsg(`✅ 已插入 ${parts.length} 张图片`)
+    return parts.join('\n')
   }
 
-  const insertImage = (e) => {
-    const file = e.target.files[0]
-    e.target.value = ''
-    if (file) uploadAndInsertImages([file])
-  }
-
-  // 粘贴图片:剪贴板含图片文件时拦截并上传;纯文本粘贴不处理
-  const handlePaste = (e) => {
-    const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'))
-    if (!files.length) return
-    e.preventDefault()
-    uploadAndInsertImages(files)
-  }
+  // 编辑态挂载 vditor:IR 即时渲染,编辑时图片/格式就地显示;切换模式重建
+  useEffect(() => {
+    if (!editing || mode === 'preview' || !editorRef.current) return
+    const vd = new Vditor(editorRef.current, {
+      cdn: 'vditor',
+      lang: 'zh_CN',
+      mode: mode === 'split' ? 'sv' : 'ir',
+      height: '100%',
+      value: draftRef.current.content_md || '',
+      cache: { enable: false },
+      upload: {
+        handler: async (files) => {
+          const md = await uploadImagesToMarkdown(files)
+          if (md) vdInst.current?.insertValue(md + '\n')
+          return null
+        },
+      },
+      input: (v) => setDraft((d) => ({ ...d, content_md: v })),
+    })
+    vdInst.current = vd
+    return () => {
+      try { vdInst.current?.destroy() } catch { /* ignore */ }
+      vdInst.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, mode])
 
   const preview = (md) => {
     return { __html: marked.parse(md || '', { breaks: true }) }
@@ -214,10 +228,7 @@ export default function Knowledge() {
                 <div className="row">
                   {editing ? (
                     <>
-                      <label className="btn ghost" style={{ cursor: 'pointer' }} title="选择文件上传,或直接 Ctrl+V 粘贴截图">🖼 插入图片
-                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={insertImage} />
-                      </label>
-                      <select value={mode} onChange={(e) => setMode(e.target.value)}>
+                      <select value={mode} onChange={(e) => setMode(e.target.value)} title="编辑=即时渲染(图片就地显示)">
                         <option value="edit">编辑</option>
                         <option value="split">分屏</option>
                         <option value="preview">预览</option>
@@ -240,15 +251,11 @@ export default function Knowledge() {
                 </div>
               </div>
               {editing ? (
-                <div ref={editorRef} data-color-mode="light" style={{ flex: 1, minHeight: 420, display: 'flex' }} onPaste={handlePaste}>
-                  <MDEditor
-                    value={draft.content_md}
-                    onChange={(v) => setDraft({ ...draft, content_md: v || '' })}
-                    preview={mode === 'split' ? 'live' : mode}
-                    height="100%"
-                    style={{ flex: 1, background: '#fff' }}
-                  />
-                </div>
+                mode === 'preview' ? (
+                  <div className="md" style={{ flex: 1, overflow: 'auto' }} dangerouslySetInnerHTML={preview(draft.content_md)} />
+                ) : (
+                  <div ref={editorRef} className="kb-vditor" style={{ flex: 1, minHeight: 420 }} />
+                )
               ) : (
                 <div className="md" style={{ overflow: 'auto' }} dangerouslySetInnerHTML={preview(note.content_md)} />
               )}

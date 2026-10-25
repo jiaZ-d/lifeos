@@ -173,6 +173,9 @@ textarea { width: 100%; min-height: 70px; resize: vertical; }
 }
 .kb-modal { width: 340px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .kb-modal input { width: 100%; }
+.kb-vditor { display: flex; }
+.kb-vditor .vditor { flex: 1; height: 100% !important; border-radius: 8px; }
+.kb-vditor .vditor img { max-width: 100%; }
 .md h1 { font-size: 22px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .md h2 { font-size: 18px; margin-top: 20px; }
 .md h3 { font-size: 15px; }

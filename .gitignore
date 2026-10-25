@@ -14,6 +14,7 @@ pytest-cache-files-*/
 # Node / 前端构建产物(可由 npx vite build 重建)
 node_modules/
 dist/
+apps/web/public/vditor/
 
 # 调试残留
 debug_out.txt
