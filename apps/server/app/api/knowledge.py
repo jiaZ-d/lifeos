@@ -75,6 +75,46 @@ async def get_tree(
 
 # ---------- domain ----------
 
+@router.get("/recent")
+async def recent_notes(
+    limit: int = 8,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """最近更新的笔记(按 updated_at 倒序,含所属位置,用于快速再次打开)。"""
+    limit = max(1, min(limit, 20))
+    notes = (
+        await db.execute(
+            select(KnowledgeNote)
+            .where(KnowledgeNote.user_id == user.id)
+            .order_by(KnowledgeNote.updated_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+    folders = {
+        f.id: f
+        for f in (
+            await db.execute(select(KnowledgeFolder).where(KnowledgeFolder.user_id == user.id))
+        ).scalars().all()
+    }
+    domains = {
+        d.id: d.name
+        for d in (
+            await db.execute(select(KnowledgeDomain).where(KnowledgeDomain.user_id == user.id))
+        ).scalars().all()
+    }
+    return [
+        {
+            "id": n.id,
+            "title": n.title,
+            "updated_at": n.updated_at.isoformat(),
+            "domain": domains.get(folders[n.folder_id].domain_id, "") if n.folder_id in folders else "",
+            "folder": folders[n.folder_id].name if n.folder_id in folders else "",
+        }
+        for n in notes
+    ]
+
+
 @router.post("/domains")
 async def create_domain(
     body: NameIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)

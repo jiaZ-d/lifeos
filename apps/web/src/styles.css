@@ -173,6 +173,10 @@ textarea { width: 100%; min-height: 70px; resize: vertical; }
 }
 .kb-modal { width: 340px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .kb-modal input { width: 100%; }
+.kb-recent { border-bottom: 1px solid var(--border); padding: 4px 0 8px; margin-bottom: 8px; }
+.kb-recent-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 4px; cursor: pointer; border-radius: 4px; font-size: 13px; }
+.kb-recent-item:hover { background: rgba(0, 0, 0, 0.05); }
+.kb-recent-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kb-vditor { display: flex; }
 .kb-mode-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .kb-mode-switch button {

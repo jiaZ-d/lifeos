@@ -145,3 +145,19 @@ async def test_knowledge_image_upload_and_access(client):
     assert own.status_code == 200 and own.content == png  # 本人 cookie 可取
     assert (await client.get(url, cookies={"lifeos_token": tok3})).status_code == 403  # 他人图片仍拒绝
     assert (await client.get(url3)).status_code == 401  # 无任何凭据
+
+
+async def test_knowledge_recent(client):
+    h1, _ = await _auth(client, "kbrecent1")
+    h2, _ = await _auth(client, "kbrecent2")
+    d = (await client.post("/api/knowledge/domains", json={"name": "D"}, headers=h1)).json()
+    f = (await client.post(f"/api/knowledge/domains/{d['id']}/folders", json={"name": "F"}, headers=h1)).json()
+    n1 = (await client.post("/api/knowledge/notes", json={"folder_id": f["id"], "title": "旧笔记"}, headers=h1)).json()
+    n2 = (await client.post("/api/knowledge/notes", json={"folder_id": f["id"], "title": "新笔记"}, headers=h1)).json()
+    # 稍后再更新"旧笔记",使其成为最近更新
+    await client.put(f"/api/knowledge/notes/{n1['id']}", json={"content_md": "edited"}, headers=h1)
+    r = await client.get("/api/knowledge/recent", headers=h1)
+    data = r.json()
+    assert [x["title"] for x in data][:2] == ["旧笔记", "新笔记"]  # updated_at 倒序
+    assert data[0]["domain"] == "D" and data[0]["folder"] == "F"
+    assert (await client.get("/api/knowledge/recent", headers=h2)).json() == []  # 用户隔离

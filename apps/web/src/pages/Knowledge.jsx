@@ -22,8 +22,18 @@ const ModeSwitch = ({ mode, setMode }) => (
   </div>
 )
 
+const fmtTime = (iso) => {
+  const d = new Date(iso)
+  const now = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  if (d.toDateString() === now.toDateString()) return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}-${pad(d.getDate())}`
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export default function Knowledge() {
   const [tree, setTree] = useState([])
+  const [recent, setRecent] = useState([])    // 最近更新的笔记
   const [openD, setOpenD] = useState({})      // domain expansion
   const [openF, setOpenF] = useState({})      // folder expansion
   const [note, setNote] = useState(null)      // currently open note {id,folder_id,title,content_md}
@@ -54,7 +64,10 @@ export default function Knowledge() {
     try { await m.onOk(modalValue.trim()) } catch (ex) { setMsg(ex.message) }
   }
 
-  const load = async () => setTree(await api.get('/api/knowledge/tree'))
+  const load = async () => {
+    setTree(await api.get('/api/knowledge/tree'))
+    api.get('/api/knowledge/recent').then(setRecent).catch(() => {})
+  }
   useEffect(() => { load().catch((e) => setMsg(e.message)) }, [])
 
   const openNote = async (id) => {
@@ -68,8 +81,13 @@ export default function Knowledge() {
 
   const saveNote = async () => {
     if (!draft.title.trim()) return setMsg('标题不能为空')
-    // 编辑态以 vditor 实例当前值为准(避免初始化窗口期 React 状态滞后丢字)
-    const contentMd = vdInst.current?.getValue?.() ?? draft.content_md
+    // 编辑态优先取 vditor 实例当前值;初始化窗口期 getValue 可能抛错,回落到 input 回调同步的 draft
+    let contentMd = draft.content_md
+    try {
+      if (vdInst.current && typeof vdInst.current.getValue === 'function') {
+        contentMd = vdInst.current.getValue() || contentMd
+      }
+    } catch { /* vditor 未就绪,用 draft */ }
     try {
       if (newFolderId != null) {
         // 新建:直接在右侧编辑后保存创建
@@ -187,6 +205,19 @@ export default function Knowledge() {
             <b>领域 / 笔记本 / 笔记</b>
             <button className="ghost" onClick={addDomain}>＋ 领域</button>
           </div>
+          {recent.length > 0 && (
+            <div className="kb-recent">
+              <div className="muted" style={{ fontSize: 12, marginBottom: 2 }}>🕘 最近笔记</div>
+              {recent.slice(0, 6).map((n) => (
+                <div key={n.id} className="kb-recent-item" title={`${n.domain} / ${n.folder}`}
+                  style={{ color: note?.id === n.id ? 'var(--primary)' : 'inherit' }}
+                  onClick={() => openNote(n.id)}>
+                  <span className="kb-recent-title">📄 {n.title}</span>
+                  <span className="muted" style={{ fontSize: 11, flexShrink: 0 }}>{fmtTime(n.updated_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {tree.length === 0 && <p className="muted">还没有领域,点"＋ 领域"创建</p>}
           {tree.map((d) => (
             <div key={d.id} style={{ marginBottom: 4 }}>
