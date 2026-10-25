@@ -10,7 +10,7 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState('')
   const [keyMasked, setKeyMasked] = useState('')
   const [keyRevealed, setKeyRevealed] = useState(false)
-  const [llmCfg, setLlmCfg] = useState({ base_url: '', model: '' })
+  const [llmCfg, setLlmCfg] = useState({ base_url: '', model: '', thinking: 'default' })
   const [models, setModels] = useState([])
   const [modelSource, setModelSource] = useState('preset')
   const [customModel, setCustomModel] = useState(false)
@@ -27,7 +27,7 @@ export default function Settings() {
     setCurrentUserId(me.user_id)
     if (me.is_admin) setUsers(await api.get('/api/auth/users'))
     const cfg = await api.get('/api/llm/config')
-    setLlmCfg({ base_url: cfg.base_url, model: cfg.model })
+    setLlmCfg({ base_url: cfg.base_url, model: cfg.model, thinking: cfg.thinking || 'default' })
     setKeyMasked(cfg.api_key_masked || '')
     if (cfg.has_api_key) setMsg('已配置 API Key')
     // model list: provider listing if available, else presets
@@ -88,8 +88,9 @@ export default function Settings() {
       api_key: apiKey || null,
       base_url: llmCfg.base_url || null,
       model: llmCfg.model || null,
+      thinking: llmCfg.thinking || 'default',
     })
-    setMsg('✅ LLM 配置已保存(持久化到本机 data/llm_config.json)')
+    setMsg('✅ LLM 配置已保存(持久化到本机 config/llm_config.json)')
     await load()
   }
 
@@ -248,13 +249,24 @@ export default function Settings() {
           )}
         </div>
         <div className="row" style={{ marginTop: 8 }}>
+          <span className="muted" style={{ width: 86 }}>🧠 思考强度</span>
+          <select value={llmCfg.thinking || 'default'} style={{ width: 220 }}
+            onChange={(e) => setLlmCfg({ ...llmCfg, thinking: e.target.value })}>
+            <option value="default">默认(跟随服务商)</option>
+            <option value="off">关闭(响应最快)</option>
+            <option value="low">低</option>
+            <option value="medium">中</option>
+            <option value="high">高(更强推理)</option>
+          </select>
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
           <button onClick={saveKey}>保存配置</button>
           <button className="ghost" onClick={testLlm}>测试连接</button>
         </div>
         </>
         ) : (
           <>
-          <p className="muted">当前端点:{llmCfg.base_url} · 模型:{llmCfg.model}{keyMasked ? ` · API Key:${keyMasked}` : ' · 未配置 API Key'}</p>
+          <p className="muted">当前端点:{llmCfg.base_url} · 模型:{llmCfg.model}{keyMasked ? ` · API Key:${keyMasked}` : ' · 未配置 API Key'} · 思考强度:{({ default: '默认', off: '关闭', low: '低', medium: '中', high: '高' })[llmCfg.thinking || 'default']}</p>
           <p className="muted">修改 LLM 配置请联系管理员。</p>
           </>
         )}

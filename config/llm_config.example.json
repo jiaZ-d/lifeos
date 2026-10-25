@@ -1,5 +1,6 @@
 {
   "base_url": "https://open.bigmodel.cn/api/paas/v4",
-  "model": "glm-5.3-flash",
-  "api_key": "xxx"
+  "model": "glm-5.3",
+  "api_key": "xxx",
+  "thinking": "default"
 }

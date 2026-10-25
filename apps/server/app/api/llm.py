@@ -260,10 +260,15 @@ PRESET_MODELS = [
 ]
 
 
+THINKING_LEVELS = ("default", "off", "low", "medium", "high")
+THINKING_LEVELS_CN = {"default": "默认", "off": "关闭", "low": "低", "medium": "中", "high": "高"}
+
+
 class LLMConfigIn(BaseModel):
     base_url: str | None = Field(default=None, max_length=256)
     model: str | None = Field(default=None, max_length=64)
     api_key: str | None = Field(default=None, max_length=256)
+    thinking: str | None = Field(default=None, max_length=8)
 
 
 @router.get("/config")
@@ -278,6 +283,7 @@ async def get_config(user: User = Depends(get_current_user)):
         "model": cfg.get("model") or "glm-5.3-flash",
         "has_api_key": bool(key),
         "api_key_masked": masked,
+        "thinking": cfg.get("thinking") if cfg.get("thinking") in THINKING_LEVELS else "default",
     }
 
 
@@ -302,9 +308,20 @@ async def set_config(body: LLMConfigIn, admin: User = Depends(get_admin_user)):
         cfg["model"] = body.model.strip()
     if body.api_key is not None:
         cfg["api_key"] = body.api_key.strip()
+    if body.thinking is not None:
+        if body.thinking not in THINKING_LEVELS:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "thinking must be default|off|low|medium|high"
+            )
+        cfg["thinking"] = body.thinking
     save_llm_config(cfg)
     llm_svc.set_api_key(cfg.get("api_key"))
-    return {"ok": True, "model": cfg.get("model"), "base_url": cfg.get("base_url")}
+    return {
+        "ok": True,
+        "model": cfg.get("model"),
+        "base_url": cfg.get("base_url"),
+        "thinking": cfg.get("thinking") or "default",
+    }
 
 
 @router.post("/test")

@@ -82,7 +82,7 @@ $env:PYTHONPATH = "$PWD"
 | 文件 | 说明 |
 |---|---|
 | `config/server.json` | 服务监听地址与端口(`host` / `port`),`python -m app.main` 与启动脚本均读取此文件 |
-| `config/llm_config.json` | LLM 运行时配置:`base_url` / `model` / `api_key` |
+| `config/llm_config.json` | LLM 运行时配置:`base_url` / `model` / `api_key` / `thinking`(思考强度:默认/关闭/低/中/高) |
 | `config/llm_config.example.json` | 上述文件的模板,Key 以 `xxx` 占位 |
 
 **模型 Key 配置步骤**:
@@ -90,7 +90,8 @@ $env:PYTHONPATH = "$PWD"
 1. 复制模板:`copy config\llm_config.example.json config\llm_config.json`(也可以直接在应用「⚙️ 设置 → 🤖 LLM 配置」页填写,仅管理员,保存即写入该文件);
 2. 把 `api_key` 的 `xxx` 替换为真实 Key——默认端点是[智谱开放平台](https://open.bigmodel.cn/) `https://open.bigmodel.cn/api/paas/v4`,Key 在其控制台创建;模型名必须是平台上架的(如 `glm-5.3-flash`);
 3. `base_url` 兼容任意 OpenAI 风格端点,可自行切换其他服务商;
-4. 不配置 Key 也能用:所有 AI 功能自动降级为内置模板输出,其余功能不受影响。
+4. 不配置 Key 也能用:所有 AI 功能自动降级为内置模板输出,其余功能不受影响;
+5. 可选「🧠 思考强度」:默认(跟随服务商)/ 关闭(响应最快)/ 低 / 中 / 高(更强推理),在设置页选择,对智谱 GLM 混合推理模型生效。
 
 ## 定时任务
 

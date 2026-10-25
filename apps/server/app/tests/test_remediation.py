@@ -193,3 +193,28 @@ async def test_export_excludes_other_users(client):
     conn.close()
     assert "mine" in titles and "theirs" not in titles
     assert users == ["exp1"]
+
+
+# ---------- LLM 思考强度配置 ----------
+
+async def test_llm_thinking_config(client, monkeypatch):
+    import app.config as appcfg
+    from app.services import llm as llm_svc
+
+    tmp = appcfg.CONFIG_DIR / f"llm_config_test_{uuid.uuid4().hex[:6]}.json"
+    monkeypatch.setattr(appcfg, "LLM_CONFIG_PATH", tmp)
+    admin = await client.post("/api/auth/register", json={"username": "root3", "password": "pass123456"})
+    ah = {"Authorization": f"Bearer {admin.json()['token']}"}
+    bob = await client.post("/api/auth/register", json={"username": "bobthink", "password": "pass123456"})
+    bh = {"Authorization": f"Bearer {bob.json()['token']}"}
+    # 非管理员改配置 -> 403;非法值 -> 422
+    assert (await client.put("/api/llm/config", json={"thinking": "off"}, headers=bh)).status_code == 403
+    assert (await client.put("/api/llm/config", json={"thinking": "ultra"}, headers=ah)).status_code == 422
+    # 合法保存 + 回读 + runtime 生效
+    r = await client.put("/api/llm/config", json={"thinking": "low"}, headers=ah)
+    assert r.status_code == 200 and r.json()["thinking"] == "low"
+    assert (await client.get("/api/llm/config", headers=bh)).json()["thinking"] == "low"
+    # conftest 将 services.llm.load_llm_config 打桩为空(测试密闭);换回真实实现验证 runtime 链路
+    monkeypatch.setattr(llm_svc, "load_llm_config", appcfg.load_llm_config)
+    assert llm_svc._runtime()["thinking"] == "low"
+    tmp.unlink(missing_ok=True)

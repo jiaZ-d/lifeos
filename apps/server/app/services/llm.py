@@ -27,18 +27,22 @@ class LLMUnavailable(Exception):
 
 
 def _runtime() -> dict:
-    """Effective LLM settings: persisted config overrides defaults (model/base_url/api_key)."""
+    """Effective LLM settings: persisted config overrides defaults (model/base_url/api_key/thinking)."""
     cfg = load_llm_config()
     return {
         "base_url": cfg.get("base_url") or settings.llm_base_url,
         "model": cfg.get("model") or settings.llm_model,
         "api_key": cfg.get("api_key") or _API_KEY,
+        "thinking": cfg.get("thinking") or "default",
     }
 
 
 def _cache_key(func: str, payload: dict) -> str:
     cfg = _runtime()
-    raw = json.dumps({"f": func, "p": payload, "v": PROMPT_VERSION, "m": cfg["model"]}, ensure_ascii=False)
+    raw = json.dumps(
+        {"f": func, "p": payload, "v": PROMPT_VERSION, "m": cfg["model"], "t": cfg["thinking"]},
+        ensure_ascii=False,
+    )
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -89,6 +93,13 @@ async def _call_glm(messages: list[dict], force_json: bool) -> str:
         api_key=cfg["api_key"], base_url=cfg["base_url"], timeout=settings.llm_timeout_seconds
     )
     kwargs: dict = {"model": cfg["model"], "messages": messages}
+    # 思考强度(智谱 GLM 混合推理/OpenAI 兼容端点,实测两种参数均生效):
+    # off -> thinking.type=disabled;low/medium/high -> reasoning_effort
+    thinking = cfg.get("thinking") or "default"
+    if thinking == "off":
+        kwargs["thinking"] = {"type": "disabled"}
+    elif thinking in ("low", "medium", "high"):
+        kwargs["reasoning_effort"] = thinking
     if force_json:
         kwargs["response_format"] = {"type": "json_object"}
     resp = await client.chat.completions.create(**kwargs)
