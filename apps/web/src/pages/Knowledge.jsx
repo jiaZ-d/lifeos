@@ -15,7 +15,24 @@ export default function Knowledge() {
   const [draft, setDraft] = useState({ title: '', content_md: '' })
   const [msg, setMsg] = useState('')
   const [mode, setMode] = useState('edit')    // edit | preview | split
+  const [modal, setModal] = useState(null)    // 页内弹窗: {kind:'input'|'confirm', ...}
+  const [modalValue, setModalValue] = useState('')
   const taRef = useRef(null)
+
+  const askInput = (title, onOk, placeholder = '') => {
+    setModalValue('')
+    setModal({ kind: 'input', title, okText: '确定', onOk, placeholder })
+  }
+  const askConfirm = (message, onOk) => {
+    setModal({ kind: 'confirm', title: '确认删除', message, okText: '删除', onOk })
+  }
+  const submitModal = async () => {
+    const m = modal
+    if (!m) return
+    if (m.kind === 'input' && !modalValue.trim()) { setMsg('名称不能为空'); return }
+    setModal(null)
+    try { await m.onOk(modalValue.trim()) } catch (ex) { setMsg(ex.message) }
+  }
 
   const load = async () => setTree(await api.get('/api/knowledge/tree'))
   useEffect(() => { load().catch((e) => setMsg(e.message)) }, [])
@@ -39,34 +56,29 @@ export default function Knowledge() {
     setMsg('✅ 已保存')
   }
 
-  const addDomain = async () => {
-    const name = prompt('领域名称,如:前端开发 / 健康 / 读书笔记')
-    if (!name) return
-    try { await api.post('/api/knowledge/domains', { name }); await load() }
-    catch (ex) { setMsg(ex.message) }
-  }
+  const addDomain = () =>
+    askInput('新建领域', async (name) => {
+      await api.post('/api/knowledge/domains', { name }); await load()
+    }, '如:前端开发 / 健康 / 读书笔记')
 
-  const addFolder = async (domainId) => {
-    const name = prompt('文件夹名称')
-    if (!name) return
-    try { await api.post(`/api/knowledge/domains/${domainId}/folders`, { name }); await load() }
-    catch (ex) { setMsg(ex.message) }
-  }
+  const addFolder = (domainId) =>
+    askInput('新建笔记本', async (name) => {
+      await api.post(`/api/knowledge/domains/${domainId}/folders`, { name }); await load()
+    }, '笔记本名称')
 
-  const addNote = async (folderId) => {
-    const title = prompt('笔记标题')
-    if (!title) return
-    const r = await api.post('/api/knowledge/notes', { folder_id: folderId, title, content_md: '# ' + title + '\n\n' })
-    await load()
-    await openNote(r.id)
-  }
+  const addNote = (folderId) =>
+    askInput('新建笔记', async (title) => {
+      const r = await api.post('/api/knowledge/notes', { folder_id: folderId, title, content_md: '# ' + title + '\n\n' })
+      await load()
+      await openNote(r.id)
+    }, '笔记标题')
 
-  const del = async (kind, id, label) => {
-    if (!confirm(`确认删除${label}?(级联删除其下所有内容,不可恢复)`)) return
-    await api.del(`/api/knowledge/${kind}/${id}`)
-    if (note && kind === 'notes' && note.id === id) setNote(null)
-    await load()
-  }
+  const del = (kind, id, label) =>
+    askConfirm(`确认删除${label}?(级联删除其下所有内容,不可恢复)`, async () => {
+      await api.del(`/api/knowledge/${kind}/${id}`)
+      if (note && kind === 'notes' && note.id === id) setNote(null)
+      await load()
+    })
 
   // 图片上传:插入 markdown 语法到光标处
   const insertImage = async (e) => {
@@ -114,7 +126,7 @@ export default function Knowledge() {
         {/* left: tree */}
         <div className="card kb-tree">
           <div className="spread" style={{ marginBottom: 6 }}>
-            <b>领域 / 文件夹 / 笔记</b>
+            <b>领域 / 笔记本 / 笔记</b>
             <button className="ghost" onClick={addDomain}>＋ 领域</button>
           </div>
           {tree.length === 0 && <p className="muted">还没有领域,点"＋ 领域"创建</p>}
@@ -126,7 +138,7 @@ export default function Knowledge() {
                   <span className="muted">({d.folders.length})</span></span>
                 <span className="row">
                   <button className="ghost" style={{ padding: '2px 8px', fontSize: 12 }}
-                    onClick={(e) => { e.stopPropagation(); addFolder(d.id) }}>＋夹</button>
+                        onClick={(e) => { e.stopPropagation(); addFolder(d.id) }}>＋笔记本</button>
                   <button className="danger" style={{ padding: '2px 8px', fontSize: 12 }}
                     onClick={(e) => { e.stopPropagation(); del('domains', d.id, `领域「${d.name}」`) }}>删</button>
                 </span>
@@ -141,7 +153,7 @@ export default function Knowledge() {
                       <button className="ghost" style={{ padding: '2px 8px', fontSize: 12 }}
                         onClick={(e) => { e.stopPropagation(); addNote(f.id) }}>＋笔记</button>
                       <button className="danger" style={{ padding: '2px 8px', fontSize: 12 }}
-                        onClick={(e) => { e.stopPropagation(); del('folders', f.id, `文件夹「${f.name}」`) }}>删</button>
+                        onClick={(e) => { e.stopPropagation(); del('folders', f.id, `笔记本「${f.name}」`) }}>删</button>
                     </span>
                   </div>
                   {openF[f.id] && f.notes.map((n) => (
@@ -208,6 +220,26 @@ export default function Knowledge() {
           )}
         </div>
       </div>
+
+      {modal && (
+        <div className="kb-modal-mask" onClick={() => setModal(null)}>
+          <div className="card kb-modal" onClick={(e) => e.stopPropagation()}>
+            <b>{modal.title}</b>
+            {modal.kind === 'input' ? (
+              <input autoFocus value={modalValue} placeholder={modal.placeholder}
+                onChange={(e) => setModalValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitModal()} />
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>{modal.message}</p>
+            )}
+            <div className="row" style={{ justifyContent: 'flex-end' }}>
+              <button className="ghost" onClick={() => setModal(null)}>取消</button>
+              <button className={modal.kind === 'confirm' ? 'danger' : ''}
+                onClick={submitModal}>{modal.okText}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

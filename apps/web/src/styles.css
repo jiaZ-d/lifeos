@@ -167,6 +167,12 @@ textarea { width: 100%; min-height: 70px; resize: vertical; }
   border: 1px solid var(--border); border-radius: 8px; padding: 12px;
 }
 .kb-preview { border-left: none; padding: 4px 8px; }
+.kb-modal-mask {
+  position: fixed; inset: 0; background: rgba(15, 20, 35, 0.4);
+  display: flex; align-items: center; justify-content: center; z-index: 60;
+}
+.kb-modal { width: 340px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.kb-modal input { width: 100%; }
 .md h1 { font-size: 22px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .md h2 { font-size: 18px; margin-top: 20px; }
 .md h3 { font-size: 15px; }
