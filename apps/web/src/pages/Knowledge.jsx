@@ -208,7 +208,7 @@ export default function Knowledge() {
           {recent.length > 0 && (
             <div className="kb-recent">
               <div className="muted" style={{ fontSize: 12, marginBottom: 2 }}>🕘 最近笔记</div>
-              {recent.slice(0, 6).map((n) => (
+              {recent.slice(0, 5).map((n) => (
                 <div key={n.id} className="kb-recent-item" title={`${n.domain} / ${n.folder}`}
                   style={{ color: note?.id === n.id ? 'var(--primary)' : 'inherit' }}
                   onClick={() => openNote(n.id)}>
