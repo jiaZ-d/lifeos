@@ -8,6 +8,20 @@ const Chevron = ({ open }) => (
   <span style={{ display: 'inline-block', width: 12, color: 'var(--muted)' }}>{open ? '▾' : '▸'}</span>
 )
 
+const ModeSwitch = ({ mode, setMode }) => (
+  <div className="kb-mode-switch" role="group" aria-label="编辑模式">
+    <button type="button" className={mode === 'edit' ? 'on' : ''} title="编辑(即时渲染,图片就地显示)" onClick={() => setMode('edit')}>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>编辑
+    </button>
+    <button type="button" className={mode === 'split' ? 'on' : ''} title="分屏(边编辑边预览)" onClick={() => setMode('split')}>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16"/></svg>分屏
+    </button>
+    <button type="button" className={mode === 'preview' ? 'on' : ''} title="预览" onClick={() => setMode('preview')}>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>预览
+    </button>
+  </div>
+)
+
 export default function Knowledge() {
   const [tree, setTree] = useState([])
   const [openD, setOpenD] = useState({})      // domain expansion
@@ -127,14 +141,17 @@ export default function Knowledge() {
 
   // 编辑态挂载 vditor:IR 即时渲染,编辑时图片/格式就地显示;切换模式重建
   useEffect(() => {
-    if (!editing || mode === 'preview' || !editorRef.current) return
-    const vd = new Vditor(editorRef.current, {
+    const host = editorRef.current
+    if (!editing || mode === 'preview' || !host) return
+    const vd = new Vditor(host, {
       cdn: 'vditor',
       lang: 'zh_CN',
       mode: mode === 'split' ? 'sv' : 'ir',
       height: '100%',
       value: draftRef.current.content_md || '',
       cache: { enable: false },
+      // sv(分屏)模式必须显式开启 both,否则只有编辑区没有实时预览
+      preview: { mode: 'both', delay: 300 },
       upload: {
         handler: async (files) => {
           const md = await uploadImagesToMarkdown(files)
@@ -146,8 +163,10 @@ export default function Knowledge() {
     })
     vdInst.current = vd
     return () => {
-      try { vdInst.current?.destroy() } catch { /* ignore */ }
+      // vditor 4.x 无 destroy():清空挂载容器并复位样式(容器随 key 重建)
       vdInst.current = null
+      host.innerHTML = ''
+      host.className = 'kb-vditor'
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, mode])
@@ -228,11 +247,7 @@ export default function Knowledge() {
                 <div className="row">
                   {editing ? (
                     <>
-                      <select value={mode} onChange={(e) => setMode(e.target.value)} title="编辑=即时渲染(图片就地显示)">
-                        <option value="edit">编辑</option>
-                        <option value="split">分屏</option>
-                        <option value="preview">预览</option>
-                      </select>
+                      <ModeSwitch mode={mode} setMode={setMode} />
                       <button onClick={saveNote}>保存</button>
                       <button className="ghost" onClick={() => {
                         if (newFolderId != null) {
@@ -254,7 +269,7 @@ export default function Knowledge() {
                 mode === 'preview' ? (
                   <div className="md" style={{ flex: 1, overflow: 'auto' }} dangerouslySetInnerHTML={preview(draft.content_md)} />
                 ) : (
-                  <div ref={editorRef} className="kb-vditor" style={{ flex: 1, minHeight: 420 }} />
+                  <div key={mode} ref={editorRef} className="kb-vditor" style={{ flex: 1, minHeight: 420 }} />
                 )
               ) : (
                 <div className="md" style={{ overflow: 'auto' }} dangerouslySetInnerHTML={preview(note.content_md)} />
