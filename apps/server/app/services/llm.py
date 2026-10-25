@@ -168,7 +168,10 @@ async def generate_tasks(
     parent_line = f"\n上级任务(拆解来源,子任务必须是对它的具体化展开,不得照抄):{parent_context}" if parent_context else ""
     user = f"目标:{goal_title}\n说明:{goal_description or '无'}\n粒度:{GRANULARITY_CN.get(granularity, granularity)}{parent_line}\n现状:{profile_summary or '无记录'}"
     data = await generate_json("gen_tasks", system, user, {"goal": goal_title, "g": granularity, "p": parent_context or ""}, db)
-    return data.get("tasks", [])
+    tasks = data.get("tasks") or data.get("task_list") or data.get("items") or []
+    if isinstance(tasks, list):
+        return tasks
+    return []
 
 
 async def generate_month_plan(
@@ -236,18 +239,37 @@ async def generate_actions(
     )
     user = f"任务:{task_title}\n日程偏好:{preference or '无'}"
     data = await generate_json("gen_actions", system, user, {"task": task_title}, db)
-    return data.get("actions", [])
+    actions = data.get("actions") or data.get("action_list") or data.get("items") or []
+    if isinstance(actions, list):
+        return actions
+    return []
+
+
+def _first_string(data: dict, keys: list[str], min_len: int = 20) -> str | None:
+    """模型偶尔不按 schema 输出键名(如 summary -> summary_md),按候选键
+    与最长字符串值兜底提取;避免把整个 dict 的 repr 渲染进页面。"""
+    for k in keys:
+        v = data.get(k)
+        if isinstance(v, str) and v.strip():
+            return v
+    best = None
+    for v in data.values():
+        if isinstance(v, str) and len(v) >= min_len and len(v) > len(best or ""):
+            best = v
+    return best
 
 
 async def generate_daily_summary(db: AsyncSession, entries_text: str) -> str:
     system = (
         "你是个人助理。基于用户当天的记录和待办完成情况写一段 100-200 字的今日小结,"
         "Markdown 格式:先总结已完成的待办(✓ 项),再概括当天记录要点,语气温和具体。"
+        '只输出 JSON:{"summary": str}——summary 键之外不得添加任何其他键,不要输出日期、统计等额外字段。'
     )
     try:
         digest = hashlib.sha256(entries_text.encode()).hexdigest()[:16]
         data = await generate_json("daily_summary", system, entries_text, {"digest": digest}, db)
-        return data.get("summary") or str(data)
+        text = _first_string(data, ["summary", "summary_md", "content_md", "content", "text"])
+        return text if text else _fallback_summary(entries_text)
     except LLMUnavailable:
         return _fallback_summary(entries_text)
 
