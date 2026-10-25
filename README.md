@@ -13,7 +13,7 @@ LifeOS 是一个**本地运行**的个人成长管理系统:用六个维度记�
 | 模块 | 说明 |
 |---|---|
 | 📝 六分类记录 | 工作 / 生活作息 / 饮食 / 学习 / 锻炼 / 社交,各带专属字段;中文全文搜索;每日小结自动生成 |
-| 📚 个人知识库 | 领域 → 笔记本 → 笔记三级组织;笔记支持 Markdown(编辑 / 分屏 / 预览)与图片上传嵌入,图片按用户隔离访问 |
+| 📚 个人知识库 | 领域 → 笔记本 → 笔记三级组织;新建笔记不弹窗直达编辑,领域/笔记本页内弹窗管理;笔记支持 Markdown(编辑 / 分屏 / 预览)与图片上传嵌入,图片按用户隔离访问 |
 | 🔒 隐私加密 | 私密记录标题/内容/标签全部 AES-256-GCM 加密,列表仅显示 🔒 占位;PIN 连续错误防暴力锁定;管理员可配置恢复口令协助找回 |
 | 🎯 目标树 | 目标 → 子目标 → 月度进度规划 → 周任务,支持 AI 生成拆解草稿,上层进度由下层实时汇总 |
 | ✅ 今日待办 | 每天 02:00 自动生成(未开机则首次打开补生成);不限时待办;未完成自动顺延,3 次进入欠账区 |
@@ -56,7 +56,7 @@ cd apps/server
 uv venv --python 3.12 .venv                        # 或: python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev]"    # uv 用户: -m uv pip install -e ".[dev]"
 
-.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv\Scripts\python -m app.main                  # 监听地址/端口读 config/server.json
 ```
 
 浏览器打开 `http://127.0.0.1:8000`,点击"注册新用户"——**第一个注册的用户自动成为管理员**(密码 ≥6 位)。
@@ -74,7 +74,7 @@ npx vite build      # 开发模式:npx vite(localhost:5173,已配 CORS)
 ```powershell
 cd apps/server
 $env:PYTHONPATH = "$PWD"
-.venv\Scripts\python -m pytest          # 48 项(默认跳过 llm_real 标记的真实 API 用例)
+.venv\Scripts\python -m pytest          # 51 项(默认跳过 llm_real 标记的真实 API 用例)
 ```
 
 ## 配置(根目录 `config/`)
