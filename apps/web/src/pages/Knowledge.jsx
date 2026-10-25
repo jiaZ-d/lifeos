@@ -100,27 +100,42 @@ export default function Knowledge() {
       await load()
     })
 
-  // 图片上传:插入 markdown 语法到光标处
-  const insertImage = async (e) => {
+  // 图片上传:上传后把 Markdown 语法插入光标处(支持多张一次插入)
+  const uploadAndInsertImages = async (files) => {
+    const imgs = files.filter((f) => f.type.startsWith('image/'))
+    if (!imgs.length) return
+    setMsg('图片上传中…')
+    const parts = []
+    for (const f of imgs) {
+      const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')
+      const name = /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(f.name || '') ? f.name : `pasted.${ext}`
+      const fd = new FormData()
+      fd.append('file', f, name)
+      try {
+        const r = await api.postForm('/api/knowledge/upload-image', fd)
+        parts.push(`![${r.url.split('/').pop()}](${r.url})`)
+      } catch (ex) { setMsg(ex.message); return }
+    }
+    const ta = editorRef.current?.querySelector('textarea')
+    const s = ta ? ta.selectionStart : (draft.content_md || '').length
+    const epos = ta ? ta.selectionEnd : s
+    const text = draft.content_md || ''
+    setDraft({ ...draft, content_md: text.slice(0, s) + parts.join('\n') + '\n' + text.slice(epos) })
+    setMsg(`✅ 已插入 ${parts.length} 张图片(保存后生效)`)
+  }
+
+  const insertImage = (e) => {
     const file = e.target.files[0]
     e.target.value = ''
-    if (!file) return
-    setMsg('图片上传中…')
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const r = await api.postForm('/api/knowledge/upload-image', fd)
-      const md = `![${file.name}](${r.url})`
-      const ta = editorRef.current?.querySelector('textarea')
-      if (ta) {
-        const s = ta.selectionStart, epos = ta.selectionEnd
-        const text = draft.content_md
-        setDraft({ ...draft, content_md: text.slice(0, s) + md + '\n' + text.slice(epos) })
-      } else {
-        setDraft({ ...draft, content_md: draft.content_md + '\n' + md })
-      }
-      setMsg('✅ 图片已插入(保存后生效)')
-    } catch (ex) { setMsg(ex.message) }
+    if (file) uploadAndInsertImages([file])
+  }
+
+  // 粘贴图片:剪贴板含图片文件时拦截并上传;纯文本粘贴不处理
+  const handlePaste = (e) => {
+    const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'))
+    if (!files.length) return
+    e.preventDefault()
+    uploadAndInsertImages(files)
   }
 
   const preview = (md) => {
@@ -199,7 +214,7 @@ export default function Knowledge() {
                 <div className="row">
                   {editing ? (
                     <>
-                      <label className="btn ghost" style={{ cursor: 'pointer' }}>🖼 插入图片
+                      <label className="btn ghost" style={{ cursor: 'pointer' }} title="选择文件上传,或直接 Ctrl+V 粘贴截图">🖼 插入图片
                         <input type="file" accept="image/*" style={{ display: 'none' }} onChange={insertImage} />
                       </label>
                       <select value={mode} onChange={(e) => setMode(e.target.value)}>
@@ -225,7 +240,7 @@ export default function Knowledge() {
                 </div>
               </div>
               {editing ? (
-                <div ref={editorRef} data-color-mode="light" style={{ flex: 1, minHeight: 420, display: 'flex' }}>
+                <div ref={editorRef} data-color-mode="light" style={{ flex: 1, minHeight: 420, display: 'flex' }} onPaste={handlePaste}>
                   <MDEditor
                     value={draft.content_md}
                     onChange={(v) => setDraft({ ...draft, content_md: v || '' })}
