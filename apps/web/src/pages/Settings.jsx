@@ -275,7 +275,7 @@ export default function Settings() {
 
       <p className="muted" style={{ margin: '2px 0 8px' }}>
         {hasApiKey
-          ? <>✅ 已配置 API Key{keyMasked ? `(尾部 ${keyMasked.slice(-4)})` : ''} · 模型:{llmCfg.model}</>
+          ? <>✅ 已配置 API Key · 模型:{llmCfg.model}</>
           : <>⚠️ 未配置 API Key · AI 功能将使用内置模板</>}
       </p>
 
