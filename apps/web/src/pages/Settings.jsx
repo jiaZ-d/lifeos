@@ -283,8 +283,6 @@ export default function Settings() {
         </div>
       </div>
 
-      <p className="muted">用户管理已移至独立页面:侧边栏「👑 用户管理」(仅管理员可见)。</p>
-
       {msg && <div className="card">{msg}</div>}
     </div>
   )
