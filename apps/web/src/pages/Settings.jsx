@@ -9,6 +9,7 @@ export default function Settings() {
   const [pinStatus, setPinStatus] = useState({ exists: false, recovery_enabled: false, is_admin: false })
   const [apiKey, setApiKey] = useState('')
   const [keyMasked, setKeyMasked] = useState('')
+  const [hasApiKey, setHasApiKey] = useState(false)
   const [keyRevealed, setKeyRevealed] = useState(false)
   const [llmCfg, setLlmCfg] = useState({ base_url: '', model: '', thinking: 'default' })
   const [models, setModels] = useState([])
@@ -29,7 +30,7 @@ export default function Settings() {
     const cfg = await api.get('/api/llm/config')
     setLlmCfg({ base_url: cfg.base_url, model: cfg.model, thinking: cfg.thinking || 'default' })
     setKeyMasked(cfg.api_key_masked || '')
-    if (cfg.has_api_key) setMsg('已配置 API Key')
+    setHasApiKey(!!cfg.has_api_key)
     // model list: provider listing if available, else presets
     try {
       const m = await api.get('/api/llm/models')
@@ -271,6 +272,12 @@ export default function Settings() {
           </>
         )}
       </div>
+
+      <p className="muted" style={{ margin: '2px 0 8px' }}>
+        {hasApiKey
+          ? <>✅ 已配置 API Key{keyMasked ? `(尾部 ${keyMasked.slice(-4)})` : ''} · 模型:{llmCfg.model}</>
+          : <>⚠️ 未配置 API Key · AI 功能将使用内置模板</>}
+      </p>
 
       <div className="card">
         <b>💾 数据备份</b>
