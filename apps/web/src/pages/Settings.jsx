@@ -16,6 +16,15 @@ export default function Settings() {
   const [modelSource, setModelSource] = useState('preset')
   const [customModel, setCustomModel] = useState(false)
   const [msg, setMsg] = useState('')
+  const [toast, setToast] = useState(null)   // 页内弹窗提示: {ok:bool, text:string}
+
+  // 成功提示自动关闭;失败保留等用户手动关闭
+  useEffect(() => {
+    if (toast?.ok) {
+      const t = setTimeout(() => setToast(null), 2500)
+      return () => clearTimeout(t)
+    }
+  }, [toast])
   const [isAdmin, setIsAdmin] = useState(false)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [users, setUsers] = useState(null)
@@ -98,7 +107,13 @@ export default function Settings() {
   const testLlm = async () => {
     setMsg('连通性测试中…')
     const r = await api.post('/api/llm/test')
-    setMsg(r.ok ? '✅ 连接成功,AI 服务可用!' : `❌ 连接失败:${r.error}`)
+    if (r.ok) {
+      setMsg('')
+      setToast({ ok: true, text: '连接成功,AI 服务可用' })
+    } else {
+      setMsg('')
+      setToast({ ok: false, text: `连接失败:${r.error}` })
+    }
   }
 
   const reloadModels = async () => {
@@ -291,6 +306,18 @@ export default function Settings() {
       </div>
 
       {msg && <div className="card">{msg}</div>}
+
+      {toast && (
+        <div className="kb-modal-mask" onClick={() => setToast(null)}>
+          <div className="card kb-modal" onClick={(e) => e.stopPropagation()} style={{ width: 300, alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 34, lineHeight: 1 }}>{toast.ok ? '✅' : '❌'}</div>
+            <p style={{ margin: 0, fontWeight: 600, textAlign: 'center' }}>{toast.text}</p>
+            <button className={toast.ok ? '' : 'danger'} onClick={() => setToast(null)}>
+              {toast.ok ? '好的' : '知道了'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
